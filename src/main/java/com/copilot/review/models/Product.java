@@ -1,13 +1,16 @@
 package com.copilot.review.models;
 
 import lombok.Data;
-import java.math.BigDecimal;
 
 @Data
 public class Product {
-    private Long productId;
-    private String productName;
-    private String productDescription;
-    private BigDecimal price;
-    private String dimension;
+
+    private int id;
+    private int title;
+    private float price;
+    private String description;
+    private String category;
+    private String image;
+    private Rating rating;
+
 }
