@@ -70,15 +70,18 @@ jobs:
               }
 
               // Fetch content safely
-              const contentResp = await github.rest.repos.getContent({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                path: file.filename
-              });
-
               let content = '';
-              if (contentResp.data.content) {
-                content = Buffer.from(contentResp.data.content, 'base64').toString('utf8');
+              try {
+                const contentResp = await github.rest.repos.getContent({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  path: file.filename
+                });
+                if (contentResp.data.content) {
+                  content = Buffer.from(contentResp.data.content, 'base64').toString('utf8');
+                }
+              } catch(e) {
+                console.log(`⚠️ Could not fetch content for ${file.filename}: ${e}`);
               }
 
               // Empty class detection
@@ -99,8 +102,9 @@ jobs:
               }
             }
 
-            // Safely encode output to avoid control characters breaking JSON.parse
-            core.setOutput('all_issues', JSON.stringify(issues.map(i => i.replace(/\r/g, '').replace(/\n/g, ' '))));
+            // Escape problematic control characters before JSON.stringify
+            const safeIssues = issues.map(i => i.replace(/\r/g, '').replace(/\n/g, ' ').replace(/"/g, '\\"'));
+            core.setOutput('all_issues', JSON.stringify(safeIssues));
 
       # Original: Check PR size
       - name: Check PR size
