@@ -289,6 +289,17 @@ If review comments aren't being posted:
 2. Check the workflow run logs in the Actions tab
 3. Verify the PR is from the same repository (not a fork with restricted permissions)
 
+### JSON Parsing Errors (Fixed)
+**Issue**: The workflow previously failed with "Bad control character in string literal in JSON" errors.
+
+**Root Cause**: GitHub API responses contain control characters (newlines, tabs, etc.) in fields like file patches. When passed through GitHub Actions string interpolation (`${{ ... }}`), these characters broke JSON parsing.
+
+**Solution**: The workflow now uses base64 encoding to safely transfer complex JSON data between steps:
+- File data and issues are encoded using `Buffer.from(JSON.stringify(data)).toString('base64')`
+- Data is decoded using `JSON.parse(Buffer.from(encodedData, 'base64').toString('utf8'))`
+
+This ensures all control characters are safely transmitted without causing parsing errors.
+
 ## Contributing
 
 To improve this workflow:
