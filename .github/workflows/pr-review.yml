@@ -43,7 +43,8 @@ jobs:
             core.setOutput('files_count', files.length);
             core.setOutput('additions', pr.additions);
             core.setOutput('deletions', pr.deletions);
-            core.setOutput('all_files', JSON.stringify(files));
+            // Use base64 encoding to safely pass files data
+            core.setOutput('all_files', Buffer.from(JSON.stringify(files)).toString('base64'));
 
       # NEW: Analyze all files safely (fixed JSON parsing issue)
       - name: Analyze files
@@ -51,7 +52,8 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const files = JSON.parse('${{ steps.pr-details.outputs.all_files }}');
+            // Decode base64 encoded files data
+            const files = JSON.parse(Buffer.from('${{ steps.pr-details.outputs.all_files }}', 'base64').toString('utf8'));
             const issues = [];
             const sourceToTestMap = {};
 
@@ -102,9 +104,8 @@ jobs:
               }
             }
 
-            // Escape problematic control characters before JSON.stringify
-            const safeIssues = issues.map(i => i.replace(/\r/g, '').replace(/\n/g, ' ').replace(/"/g, '\\"'));
-            core.setOutput('all_issues', JSON.stringify(safeIssues));
+            // Encode issues array as base64 to avoid control character issues
+            core.setOutput('all_issues', Buffer.from(JSON.stringify(issues)).toString('base64'));
 
       # Original: Check PR size
       - name: Check PR size
@@ -148,7 +149,8 @@ jobs:
             const additions = parseInt('${{ steps.pr-details.outputs.additions }}');
             const deletions = parseInt('${{ steps.pr-details.outputs.deletions }}');
             const sizeComment = '${{ steps.check-size.outputs.size_comment }}';
-            const allIssues = JSON.parse('${{ steps.analyze-files.outputs.all_issues }}') || [];
+            // Decode base64 encoded issues array
+            const allIssues = JSON.parse(Buffer.from('${{ steps.analyze-files.outputs.all_issues }}', 'base64').toString('utf8')) || [];
 
             const reviewComment = `## 🤖 Automated PR Review
 
