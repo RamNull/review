@@ -28,13 +28,13 @@ public class Reviewcontroller {
     }
 
 
-    @GetMapping("ap1/v1/products")
+    @GetMapping("api/v1/products")
     public Flux<Product> getProducts(){
       return webClient.get().uri("https://fakestoreapi.com/products")
       .retrieve().bodyToFlux(Product.class);
     }
 
-    @GetMapping("ap1/v1/productsSave")
+    @GetMapping("api/v1/productsSave")
     public Flux<Product> getProductAndSaveToDB(){
         int cores = Runtime.getRuntime().availableProcessors();
         System.out.println("CPU cores: " + cores);
