@@ -40,6 +40,121 @@ The workflow is triggered on the following events:
 - When new commits are pushed to an existing PR (`synchronize`)
 - When a closed PR is reopened (`reopened`)
 
+# Automated PR Review Responsibilities
+
+This section outlines the responsibilities and checks performed by the automated PR review agent for our repository.  
+It ensures code quality, security, maintainability, and adherence to best practices.
+
+---
+
+## 1. Fetch & Analyze PR
+- Retrieve PR details, changed files, and commit history.  
+- Identify added, modified, or deleted code.  
+- Track author, branch, and file type for tailored checks.
+
+---
+
+## 2. Code Quality Checks
+
+### Error Handling & Logging
+- Detect empty or overly broad catch blocks.  
+- Flag usage of `System.out.println` or `printStackTrace()` instead of logging frameworks.  
+- Ensure exceptions are properly propagated or handled.  
+- Ensure Global Exception handling is done properly.  
+
+### Code Structure & Design
+- Check adherence to **SOLID principles** and design patterns.  
+- Detect violations of DRY (Don’t Repeat Yourself) principle.  
+- Flag God classes or methods that are too large or have too many responsibilities.  
+- Suggest refactoring opportunities for long methods or deeply nested code.  
+
+### Code Style & Conventions
+- Enforce consistent naming conventions for variables, classes, and methods. prefer camelCasing   
+- Ensure constants are used instead of magic numbers.
+
+### Language-Specific Best Practices
+- Detect improper usage of generics, raw types, or unsafe casts.  
+- Flag use of deprecated APIs or outdated libraries.  
+- Identify potential null pointer issues and missing null checks.  
+- Detect overuse of static methods or mutable static variables.  
+- Highlight potential null pointer dereferences and missing null checks.  
+- Detect overuse of static fields or mutable statics.  
+- Enforce proper Java 8+ idioms (streams, lambdas, Optionals, var).
+
+### Parallel & Concurrent Programming
+- Verify proper usage of threads, executors, and parallel streams.  
+- Check for safe use of **virtual threads** (JEP 425) if applicable.  
+- Detect potential race conditions, deadlocks, or improper synchronization.  
+- Highlight blocking calls inside reactive or non-blocking code.  
+- Suggest efficient use of thread pools and concurrency utilities.  
+
+### Performance & Maintainability
+- Flag methods or classes with high cyclomatic complexity.  
+- Detect deeply nested loops or conditionals.  
+- Identify duplicate or redundant code blocks.  
+- Highlight unnecessary object creation, repeated DB queries, or inefficient collections.  
+
+### Testability & Coverage
+- Detect code that is hard to unit test (tight coupling, hard dependencies).  
+- Identify missing interfaces or abstractions for dependency injection.  
+- Flag untested critical paths in business logic.  
+- Highlight missing or inadequate unit and integration tests.  
+
+### Documentation & Comments
+- Detect missing or outdated Javadoc / inline comments for public methods.  
+- Flag TODO/FIXME comments without proper issue tracking.  
+- Ensure comments are meaningful and up-to-date.
+- Comments to the new class or methods is mandatory to understand the context properly 
+
+### Security & Safety
+- Detect hardcoded secrets, passwords, or API keys.  
+- Identify unsafe SQL, shell, or system command usage.  
+- Flag weak cryptography, insecure random number generators, or unsafe data handling.  
+
+---
+
+## 3. Best Coding Practices
+- Write **modular, reusable, and readable code**.  
+- Follow consistent **naming conventions and formatting**.  
+- Prefer immutability where applicable.  
+- Keep methods **small and focused on a single responsibility**.  
+- Avoid deep nesting and long method chains.  
+- Use **interfaces and abstractions** for flexibility and testability.  
+- Ensure **proper resource management** (try-with-resources, closing streams).  
+- Optimize for **performance and scalability**, but maintain readability.  
+
+---
+
+## 4. Documentation & Compliance
+- Ensure updates to README, API docs, and inline comments.  
+- Verify adherence to internal coding standards and style guides.  
+- Check configuration files for secrets or misconfigurations.  
+- Track and review license or compliance notices in code.  
+
+---
+
+## 5. Reporting & Feedback
+- Post actionable PR comments with severity levels: Critical / Warning / Suggestion.  
+- Provide summary of issues, test coverage, and recommendations.  
+- Link to best practices or documentation for flagged issues.  
+
+---
+
+## 6. Optional Advanced Checks
+- Verify adherence to **functional programming principles** where applicable.  
+- Detect **immutable data structures** misuse in concurrent code.  
+- Identify potential memory leaks or large object retention.  
+- Suggest **refactoring to streams, lambdas, or reactive programming constructs**.  
+- Security the code must be secure the logging should be masking critical information if there is any and check for injection issues if any 
+
+---
+
+## 7. Continuous Improvement
+- Learn from historical PRs to suggest better patterns.  
+- Track recurring violations and generate team-level metrics.  
+- Encourage automated fixes for trivial issues (formatting, imports, logging).  
+
+
 ### Workflow Steps
 
 1. **Checkout Code**: Fetches the repository code with full history
