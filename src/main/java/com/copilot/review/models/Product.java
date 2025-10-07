@@ -9,5 +9,5 @@ public class Product {
     private String productName;
     private String productDescription;
     private BigDecimal price;
-    private String dimnsion;
+    private String dimension;
 }
