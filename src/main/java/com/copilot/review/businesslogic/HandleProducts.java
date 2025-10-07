@@ -21,7 +21,7 @@ public class HandleProducts {
                 x.setPrice((float)(x.getPrice() * CURRENCY_CONVERSION_RATE));
                 try {
 					Thread.sleep(1000);
-                    System.out.println("thread Slept for 1 sec"+ Thread.currentThread().getName());
+                    System.out.println("thread Slept for 1 sec" + Thread.currentThread().getName());
 				} catch (InterruptedException e) {
                     // Restore interrupted status
                     Thread.currentThread().interrupt();
