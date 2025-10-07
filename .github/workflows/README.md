@@ -39,18 +39,22 @@ The workflow is triggered on the following events:
 - When a PR is opened (`opened`)
 - When new commits are pushed to an existing PR (`synchronize`)
 - When a closed PR is reopened (`reopened`)
-
 # Automated PR Review Responsibilities
 
 This section outlines the responsibilities and checks performed by the automated PR review agent for our repository.  
 It ensures code quality, security, maintainability, and adherence to best practices.
+
+- Checks for documentation updates
+- Verifies test coverage
+- Posts review comments with findings
 
 ---
 
 ## 1. Fetch & Analyze PR
 - Retrieve PR details, changed files, and commit history.  
 - Identify added, modified, or deleted code.  
-- Track author, branch, and file type for tailored checks.
+- Track author, branch, and file type for tailored checks.  
+- Ensure all files in the PR are reviewed **together**, not sequentially after resolving comments in one file.  
 
 ---
 
@@ -60,73 +64,82 @@ It ensures code quality, security, maintainability, and adherence to best practi
 - Detect empty or overly broad catch blocks.  
 - Flag usage of `System.out.println` or `printStackTrace()` instead of logging frameworks.  
 - Ensure exceptions are properly propagated or handled.  
-- Ensure Global Exception handling is done properly.  
+- Ensure Global Exception handling is implemented correctly.  
+- Ensure sensitive information is **masked in logs**.  
 
 ### Code Structure & Design
 - Check adherence to **SOLID principles** and design patterns.  
 - Detect violations of DRY (Don’t Repeat Yourself) principle.  
 - Flag God classes or methods that are too large or have too many responsibilities.  
 - Suggest refactoring opportunities for long methods or deeply nested code.  
+- Enforce proper **layering and separation of concerns**.  
 
 ### Code Style & Conventions
-- Enforce consistent naming conventions for variables, classes, and methods. prefer camelCasing   
-- Ensure constants are used instead of magic numbers.
+- Enforce consistent naming conventions for variables, classes, and methods (prefer camelCase).  
+- Ensure constants are used instead of magic numbers.  
+- Flag inconsistent formatting, braces, or spacing issues.  
 
 ### Language-Specific Best Practices
 - Detect improper usage of generics, raw types, or unsafe casts.  
-- Flag use of deprecated APIs or outdated libraries.  
+- Flag deprecated APIs or outdated libraries.  
 - Identify potential null pointer issues and missing null checks.  
 - Detect overuse of static methods or mutable static variables.  
-- Highlight potential null pointer dereferences and missing null checks.  
-- Detect overuse of static fields or mutable statics.  
-- Enforce proper Java 8+ idioms (streams, lambdas, Optionals, var).
+- Enforce proper Java 8+ idioms (streams, lambdas, Optionals, var).  
+- Ensure immutability is used where possible for thread safety.  
 
 ### Parallel & Concurrent Programming
 - Verify proper usage of threads, executors, and parallel streams.  
-- Check for safe use of **virtual threads** (JEP 425) if applicable.  
+- Check for safe use of **virtual threads** (JEP 425).  
 - Detect potential race conditions, deadlocks, or improper synchronization.  
 - Highlight blocking calls inside reactive or non-blocking code.  
 - Suggest efficient use of thread pools and concurrency utilities.  
+- Flag mutable shared state in concurrent contexts.  
 
 ### Performance & Maintainability
 - Flag methods or classes with high cyclomatic complexity.  
 - Detect deeply nested loops or conditionals.  
 - Identify duplicate or redundant code blocks.  
 - Highlight unnecessary object creation, repeated DB queries, or inefficient collections.  
+- Flag files exceeding **500 lines of code**, except README, documentation, or config files, and suggest breaking them into smaller modules.  
+- Detect inefficient algorithms or resource-heavy operations.  
 
 ### Testability & Coverage
 - Detect code that is hard to unit test (tight coupling, hard dependencies).  
 - Identify missing interfaces or abstractions for dependency injection.  
 - Flag untested critical paths in business logic.  
 - Highlight missing or inadequate unit and integration tests.  
+- Suggest mocking, stubbing, or isolation improvements for better testability.  
 
 ### Documentation & Comments
 - Detect missing or outdated Javadoc / inline comments for public methods.  
 - Flag TODO/FIXME comments without proper issue tracking.  
-- Ensure comments are meaningful and up-to-date.
-- Comments to the new class or methods is mandatory to understand the context properly 
+- Ensure comments are meaningful, up-to-date, and describe context for new classes/methods.  
+- Ensure documentation changes accompany functional code changes.  
 
 ### Security & Safety
 - Detect hardcoded secrets, passwords, or API keys.  
 - Identify unsafe SQL, shell, or system command usage.  
 - Flag weak cryptography, insecure random number generators, or unsafe data handling.  
+- Check for **SQL/Command/Injection vulnerabilities** in inputs.  
+- Ensure sensitive logs are masked and anonymized.  
+- Detect improper access control or exposure of sensitive endpoints.  
 
 ---
 
 ## 3. Best Coding Practices
 - Write **modular, reusable, and readable code**.  
-- Follow consistent **naming conventions and formatting**.  
-- Prefer immutability where applicable.  
 - Keep methods **small and focused on a single responsibility**.  
 - Avoid deep nesting and long method chains.  
 - Use **interfaces and abstractions** for flexibility and testability.  
-- Ensure **proper resource management** (try-with-resources, closing streams).  
-- Optimize for **performance and scalability**, but maintain readability.  
+- Ensure proper resource management (try-with-resources, closing streams).  
+- Optimize for performance and scalability while maintaining readability.  
+- Prefer immutability for thread-safety.  
+- Use meaningful variable and method names; avoid vague names.  
 
 ---
 
 ## 4. Documentation & Compliance
-- Ensure updates to README, API docs, and inline comments.  
+- Ensure updates to README, API docs, and inline comments where applicable.  
 - Verify adherence to internal coding standards and style guides.  
 - Check configuration files for secrets or misconfigurations.  
 - Track and review license or compliance notices in code.  
@@ -136,16 +149,18 @@ It ensures code quality, security, maintainability, and adherence to best practi
 ## 5. Reporting & Feedback
 - Post actionable PR comments with severity levels: Critical / Warning / Suggestion.  
 - Provide summary of issues, test coverage, and recommendations.  
-- Link to best practices or documentation for flagged issues.  
+- Include links to documentation or best practices for flagged issues.  
+- Ensure **all files in the PR are reviewed** collectively before marking the review complete.  
 
 ---
 
 ## 6. Optional Advanced Checks
 - Verify adherence to **functional programming principles** where applicable.  
-- Detect **immutable data structures** misuse in concurrent code.  
+- Detect misuse of **immutable data structures** in concurrent code.  
 - Identify potential memory leaks or large object retention.  
-- Suggest **refactoring to streams, lambdas, or reactive programming constructs**.  
-- Security the code must be secure the logging should be masking critical information if there is any and check for injection issues if any 
+- Suggest refactoring to streams, lambdas, or reactive programming constructs.  
+- Ensure logging **does not expose sensitive information**.  
+- Check for compliance with coding standards for cloud, containerized, or distributed systems.  
 
 ---
 
@@ -153,6 +168,8 @@ It ensures code quality, security, maintainability, and adherence to best practi
 - Learn from historical PRs to suggest better patterns.  
 - Track recurring violations and generate team-level metrics.  
 - Encourage automated fixes for trivial issues (formatting, imports, logging).  
+- Provide guidance to developers on refactoring, modularization, or security improvements.
+
 
 
 ### Workflow Steps
