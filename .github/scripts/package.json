@@ -1,0 +1,14 @@
+{
+  "name": "copilot-review-scripts",
+  "version": "1.0.0",
+  "description": "Scripts for automated code review with GitHub Copilot",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.1",
+    "@octokit/rest": "^20.0.2"
+  }
+}
