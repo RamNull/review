@@ -20,7 +20,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Original step: Get PR details
+      # Get PR details
       - name: Get PR details
         id: pr-details
         uses: actions/github-script@v7
@@ -43,11 +43,9 @@ jobs:
             core.setOutput('files_count', files.length);
             core.setOutput('additions', pr.additions);
             core.setOutput('deletions', pr.deletions);
-            // Use base64 encoding to safely pass files data
             core.setOutput('all_files', Buffer.from(JSON.stringify(files)).toString('base64'));
 
-    
-      # Original: Check PR size
+      # Check PR size
       - name: Check PR size
         id: check-size
         uses: actions/github-script@v7
@@ -80,7 +78,22 @@ jobs:
             core.setOutput('size_label', sizeLabel);
             core.setOutput('size_comment', sizeComment);
 
-      # Original: Post review comment with issues appended
+      # 🔍 Extract review rules from README.md
+      - name: Extract Review Rules from README
+        id: readme
+        run: |
+          if grep -q "## Review Rules" README.md; then
+            RULES=$(awk '/## Review Rules/{flag=1;next}/^## /{flag=0}flag' README.md)
+            echo "rules<<EOF" >> $GITHUB_OUTPUT
+            echo "$RULES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "rules<<EOF" >> $GITHUB_OUTPUT
+            echo "_No review rules section found in README.md._" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      # Post automated PR review comment
       - name: Post review comment
         uses: actions/github-script@v7
         with:
@@ -89,6 +102,7 @@ jobs:
             const additions = parseInt('${{ steps.pr-details.outputs.additions }}');
             const deletions = parseInt('${{ steps.pr-details.outputs.deletions }}');
             const sizeComment = '${{ steps.check-size.outputs.size_comment }}';
+            const rules = `${{ steps.readme.outputs.rules }}`;
 
             const reviewComment = `## 🤖 Automated PR Review
 
@@ -100,6 +114,9 @@ jobs:
 
             ### Size Assessment
             ${sizeComment}
+
+            ### 🔍 Project Review Rules (from README.md)
+            ${rules}
 
             ### Checklist
             Please ensure the following before merging:
@@ -119,14 +136,13 @@ jobs:
               body: reviewComment
             });
 
-      # Original: Add size label
+      # Add PR size label
       - name: Add size label
         uses: actions/github-script@v7
         with:
           script: |
             const sizeLabel = '${{ steps.check-size.outputs.size_label }}';
 
-            // Remove existing size labels
             const { data: labels } = await github.rest.issues.listLabelsOnIssue({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -144,7 +160,6 @@ jobs:
               }
             }
 
-            // Add new size label
             try {
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
@@ -153,7 +168,6 @@ jobs:
                 labels: [sizeLabel]
               });
             } catch (error) {
-              // Label might not exist, try to create it
               const colors = {
                 'size/XS': '00ff00',
                 'size/S': '90EE90',
