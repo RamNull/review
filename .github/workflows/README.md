@@ -41,6 +41,15 @@ Each PR receives an automated checklist to ensure quality:
 
 ---
 
+# How It Works
+The workflow is triggered on the following events:
+
+- When a PR is opened (`opened`)
+- When new commits are pushed to an existing PR (`synchronize`)
+- When a closed PR is reopened (`reopened`)
+- All files in a PR are reviewed **together**, not sequentially per file.
+
+
 # Additional PR Review Responsibilities & Enhancements
 
 The PR Review Agent now includes the following enhancements on top of existing functionality:
