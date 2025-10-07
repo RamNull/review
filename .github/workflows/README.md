@@ -163,6 +163,8 @@ It ensures code quality, security, maintainability, and adherence to best practi
 - Optimize for performance and scalability while maintaining readability.  
 - Prefer immutability for thread-safety.  
 - Use meaningful variable and method names; avoid vague names.  
+- Empty classes and methods should not be allowed 
+- unit test cases should be there for all the Controllers, Services, Repositories, and other business logic classes DTO and models are exempted if there is no unit test cases should comment on the class saying that the unit tests are mandatory 
 
 ## 4. Documentation & Compliance
 - Ensure updates to README, API docs, and inline comments where applicable.  
