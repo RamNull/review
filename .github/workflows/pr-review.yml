@@ -13,13 +13,14 @@ jobs:
   review:
     runs-on: ubuntu-latest
     name: Automated PR Review
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
+      # Original step: Get PR details
       - name: Get PR details
         id: pr-details
         uses: actions/github-script@v7
@@ -30,26 +31,73 @@ jobs:
               repo: context.repo.repo,
               pull_number: context.issue.number
             });
-            
+
             const { data: files } = await github.rest.pulls.listFiles({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.issue.number
             });
-            
+
             core.setOutput('title', pr.title);
             core.setOutput('body', pr.body || '');
             core.setOutput('files_count', files.length);
             core.setOutput('additions', pr.additions);
             core.setOutput('deletions', pr.deletions);
-            
-            return {
-              title: pr.title,
-              filesChanged: files.length,
-              additions: pr.additions,
-              deletions: pr.deletions
-            };
-      
+            core.setOutput('all_files', JSON.stringify(files));
+
+      # NEW: Analyze all files for extra checks
+      - name: Analyze files
+        id: analyze-files
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const files = JSON.parse('${{ steps.pr-details.outputs.all_files }}');
+            const issues = [];
+            const sourceToTestMap = {};
+
+            for (const file of files) {
+              if (!file.filename.endsWith('.java')) continue;
+
+              // Map source files to expected test files
+              if (file.filename.includes('/main/java/')) {
+                const testFile = file.filename.replace('/main/java/', '/test/java/').replace('.java', 'Test.java');
+                sourceToTestMap[file.filename] = testFile;
+
+                // Large file warning
+                if (file.changes > 500 && !file.filename.toLowerCase().includes('readme') && !file.filename.toLowerCase().includes('doc')) {
+                  issues.push(`⚠️ File ${file.filename} is very large (${file.changes} changes). Consider splitting into smaller modules.`);
+                }
+              }
+
+              // Fetch file content
+              const contentResp = await github.rest.repos.getContent({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                path: file.filename
+              });
+              const content = Buffer.from(contentResp.data.content, 'base64').toString('utf8');
+
+              // Empty class detection
+              if (/class\s+\w+\s*{[\s]*}/.test(content)) {
+                issues.push(`⚠️ ${file.filename} appears to be empty.`);
+              }
+
+              // TODO/FIXME detection
+              if (/TODO|FIXME/.test(content)) {
+                issues.push(`⚠️ ${file.filename} contains TODO/FIXME comments. Ensure they are tracked in an issue.`);
+              }
+            }
+
+            // Check missing unit tests
+            for (const [source, testFile] of Object.entries(sourceToTestMap)) {
+              if (!files.some(f => f.filename === testFile)) {
+                issues.push(`❌ Missing unit test for ${source}. Expected test file: ${testFile}`);
+              }
+            }
+
+            core.setOutput('all_issues', JSON.stringify(issues));
+
+      # Original: Check PR size
       - name: Check PR size
         id: check-size
         uses: actions/github-script@v7
@@ -58,10 +106,10 @@ jobs:
             const additions = parseInt('${{ steps.pr-details.outputs.additions }}');
             const deletions = parseInt('${{ steps.pr-details.outputs.deletions }}');
             const totalChanges = additions + deletions;
-            
+
             let sizeLabel = '';
             let sizeComment = '';
-            
+
             if (totalChanges < 50) {
               sizeLabel = 'size/XS';
               sizeComment = '✅ This is a very small PR. Great for quick reviews!';
@@ -78,10 +126,11 @@ jobs:
               sizeLabel = 'size/XL';
               sizeComment = '🚨 This is a very large PR. It will be difficult to review. Please break it into smaller PRs.';
             }
-            
+
             core.setOutput('size_label', sizeLabel);
             core.setOutput('size_comment', sizeComment);
-      
+
+      # Original: Post review comment with new issues appended
       - name: Post review comment
         uses: actions/github-script@v7
         with:
@@ -90,18 +139,19 @@ jobs:
             const additions = parseInt('${{ steps.pr-details.outputs.additions }}');
             const deletions = parseInt('${{ steps.pr-details.outputs.deletions }}');
             const sizeComment = '${{ steps.check-size.outputs.size_comment }}';
-            
+            const allIssues = JSON.parse('${{ steps.analyze-files.outputs.all_issues }}') || [];
+
             const reviewComment = `## 🤖 Automated PR Review
-            
+
             ### PR Statistics
             - **Files changed:** ${filesCount}
             - **Lines added:** +${additions}
             - **Lines deleted:** -${deletions}
             - **Total changes:** ${additions + deletions}
-            
+
             ### Size Assessment
             ${sizeComment}
-            
+
             ### Checklist
             Please ensure the following before merging:
             - [ ] Code follows the project's coding standards
@@ -109,30 +159,33 @@ jobs:
             - [ ] Documentation has been updated (if needed)
             - [ ] All CI checks pass
             - [ ] PR has been reviewed by at least one team member
-            
+
+            ${allIssues.length > 0 ? '### Issues Found\n' + allIssues.map(i => `- ${i}`).join('\n') : ''}
+
             ---
             *This is an automated review. Please reach out to maintainers if you have questions.*`;
-            
+
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
               body: reviewComment
             });
-      
+
+      # Original: Add size label
       - name: Add size label
         uses: actions/github-script@v7
         with:
           script: |
             const sizeLabel = '${{ steps.check-size.outputs.size_label }}';
-            
+
             // Remove existing size labels
             const { data: labels } = await github.rest.issues.listLabelsOnIssue({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number
             });
-            
+
             for (const label of labels) {
               if (label.name.startsWith('size/')) {
                 await github.rest.issues.removeLabel({
@@ -143,7 +196,7 @@ jobs:
                 });
               }
             }
-            
+
             // Add new size label
             try {
               await github.rest.issues.addLabels({
@@ -161,7 +214,7 @@ jobs:
                 'size/L': 'FFA500',
                 'size/XL': 'FF0000'
               };
-              
+
               await github.rest.issues.createLabel({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -169,7 +222,7 @@ jobs:
                 color: colors[sizeLabel] || 'CCCCCC',
                 description: `Pull request size: ${sizeLabel.split('/')[1]}`
               });
-              
+
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,

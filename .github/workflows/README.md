@@ -13,6 +13,7 @@ When a pull request is opened or updated, the agent automatically posts a review
 - Total change count
 - PR size assessment
 - A review checklist
+- Code quality, unit test presence, TODO/FIXME, large files, and empty class warnings
 
 ### 2. **Size-based Labeling**
 The agent automatically labels PRs based on their size:
@@ -32,28 +33,55 @@ Each PR receives an automated checklist to ensure quality:
 - Documentation has been updated (if needed)
 - All CI checks pass
 - PR has been reviewed by at least one team member
+- No empty classes or controllers
+- Large files are split if >500 lines
+- TODO/FIXME comments are tracked in issues
+- Unit tests exist for all controllers, services, and repositories
 
-## How It Works
+---
 
-The workflow is triggered on the following events:
-- When a PR is opened (`opened`)
-- When new commits are pushed to an existing PR (`synchronize`)
-- When a closed PR is reopened (`reopened`)
+# Additional PR Review Responsibilities & Enhancements
+
+The PR Review Agent now includes the following enhancements on top of existing functionality:
+
+## Holistic PR Review
+- All files in a PR are reviewed **together**, not sequentially per file.
+- Review comments are aggregated and posted **once per PR** for clarity.
+- Large files (>500 lines) are flagged for splitting, except README, docs, or config files.
+
+## Unit Test Detection
+- Detects missing **unit tests** for Controllers, Services, Repositories, and other business logic classes.
+- Exceptions are allowed for simple DTOs / POJOs (like `@Data` classes) if low-risk.
+- Optional integration with coverage reports (JaCoCo/Cobertura) to flag classes with low coverage.
+- Flags critical paths with missing or insufficient tests.
+
+## Microservice & Architectural Principles
+- Checks for proper layering and separation of concerns.
+- Flags tight coupling or God classes violating **single responsibility**.
+- Suggests implementing appropriate **design patterns** (Factory, Strategy, Observer, etc.) where it improves readability, testability, or maintainability.
+- Encourages loose coupling and modular services for better microservice design.
+
+## Best Practices Enhancements
+- TODO/FIXME comments are flagged if not linked to tracked issues.
+- Sensitive data in logs is masked to ensure security.
+- Empty classes or controllers are flagged for review.
+- Parallel and concurrent programming checks, including proper use of threads, virtual threads, and reactive constructs.
+- Ensures code adheres to SOLID principles and general coding standards.
+- Flags large files or deeply nested methods for maintainability.
+- Promotes functional programming where applicable.
+
+---
 
 # Automated PR Review Responsibilities
 
 This section outlines the responsibilities and checks performed by the automated PR review agent for our repository.  
 It ensures code quality, security, maintainability, and adherence to best practices.
 
----
-
 ## 1. Fetch & Analyze PR
 - Retrieve PR details, changed files, and commit history.  
 - Identify added, modified, or deleted code.  
 - Track author, branch, and file type for tailored checks.  
 - Ensure all files in the PR are reviewed **together**, not sequentially after resolving comments in one file.  
-
----
 
 ## 2. Code Quality Checks
 
@@ -125,8 +153,6 @@ It ensures code quality, security, maintainability, and adherence to best practi
 - Ensure sensitive logs are masked and anonymized.  
 - Detect improper access control or exposure of sensitive endpoints.  
 
----
-
 ## 3. Best Coding Practices
 - Write **modular, reusable, and readable code**.  
 - Keep methods **small and focused on a single responsibility**.  
@@ -137,23 +163,17 @@ It ensures code quality, security, maintainability, and adherence to best practi
 - Prefer immutability for thread-safety.  
 - Use meaningful variable and method names; avoid vague names.  
 
----
-
 ## 4. Documentation & Compliance
 - Ensure updates to README, API docs, and inline comments where applicable.  
 - Verify adherence to internal coding standards and style guides.  
 - Check configuration files for secrets or misconfigurations.  
 - Track and review license or compliance notices in code.  
 
----
-
 ## 5. Reporting & Feedback
 - Post actionable PR comments with severity levels: Critical / Warning / Suggestion.  
 - Provide summary of issues, test coverage, and recommendations.  
 - Include links to documentation or best practices for flagged issues.  
 - Ensure **all files in the PR are reviewed** collectively before marking the review complete.  
-
----
 
 ## 6. Optional Advanced Checks
 - Verify adherence to **functional programming principles** where applicable.  
@@ -162,8 +182,6 @@ It ensures code quality, security, maintainability, and adherence to best practi
 - Suggest refactoring to streams, lambdas, or reactive programming constructs.  
 - Ensure logging **does not expose sensitive information**.  
 - Check for compliance with coding standards for cloud, containerized, or distributed systems.  
-
----
 
 ## 7. Continuous Improvement
 - Learn from historical PRs to suggest better patterns.  
