@@ -39,14 +39,11 @@ The workflow is triggered on the following events:
 - When a PR is opened (`opened`)
 - When new commits are pushed to an existing PR (`synchronize`)
 - When a closed PR is reopened (`reopened`)
+
 # Automated PR Review Responsibilities
 
 This section outlines the responsibilities and checks performed by the automated PR review agent for our repository.  
 It ensures code quality, security, maintainability, and adherence to best practices.
-
-- Checks for documentation updates
-- Verifies test coverage
-- Posts review comments with findings
 
 ---
 
@@ -81,7 +78,7 @@ It ensures code quality, security, maintainability, and adherence to best practi
 
 ### Language-Specific Best Practices
 - Detect improper usage of generics, raw types, or unsafe casts.  
-- Flag deprecated APIs or outdated libraries.  
+- Flag use of deprecated APIs or outdated libraries.  
 - Identify potential null pointer issues and missing null checks.  
 - Detect overuse of static methods or mutable static variables.  
 - Enforce proper Java 8+ idioms (streams, lambdas, Optionals, var).  
@@ -108,7 +105,11 @@ It ensures code quality, security, maintainability, and adherence to best practi
 - Identify missing interfaces or abstractions for dependency injection.  
 - Flag untested critical paths in business logic.  
 - Highlight missing or inadequate unit and integration tests.  
-- Suggest mocking, stubbing, or isolation improvements for better testability.  
+- Detect missing **unit tests** for:
+  - Controllers, Services, Repositories, and other business logic classes.  
+  - Public APIs or critical methods.  
+- Allow exceptions for simple DTOs / POJOs (like `@Data` classes) if low-risk.  
+- Optional: Integrate coverage reports (JaCoCo, Cobertura) and flag classes with <threshold coverage.  
 
 ### Documentation & Comments
 - Detect missing or outdated Javadoc / inline comments for public methods.  
@@ -168,8 +169,7 @@ It ensures code quality, security, maintainability, and adherence to best practi
 - Learn from historical PRs to suggest better patterns.  
 - Track recurring violations and generate team-level metrics.  
 - Encourage automated fixes for trivial issues (formatting, imports, logging).  
-- Provide guidance to developers on refactoring, modularization, or security improvements.
-
+- Provide guidance to developers on refactoring, modularization, security improvements, and test coverage.
 
 
 ### Workflow Steps
