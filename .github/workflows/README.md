@@ -36,7 +36,8 @@ Each PR receives an automated checklist to ensure quality:
 - No empty classes or controllers
 - Large files are split if >500 lines
 - TODO/FIXME comments are tracked in issues
-- Unit tests exist for all controllers, services, and repositories
+- Unit tests exist for all controllers, services, and repositories if there are missing unit test classes or public API methods comment should be attached to the respective class or method 
+- very very importantly all files are reviewed together 
 
 ---
 
@@ -288,17 +289,6 @@ If review comments aren't being posted:
 1. Ensure `pull-requests: write` permission is granted
 2. Check the workflow run logs in the Actions tab
 3. Verify the PR is from the same repository (not a fork with restricted permissions)
-
-### JSON Parsing Errors (Fixed)
-**Issue**: The workflow previously failed with "Bad control character in string literal in JSON" errors.
-
-**Root Cause**: GitHub API responses contain control characters (newlines, tabs, etc.) in fields like file patches. When passed through GitHub Actions string interpolation (`${{ ... }}`), these characters broke JSON parsing.
-
-**Solution**: The workflow now uses base64 encoding to safely transfer complex JSON data between steps:
-- File data and issues are encoded using `Buffer.from(JSON.stringify(data)).toString('base64')`
-- Data is decoded using `JSON.parse(Buffer.from(encodedData, 'base64').toString('utf8'))`
-
-This ensures all control characters are safely transmitted without causing parsing errors.
 
 ## Contributing
 
