@@ -9,9 +9,8 @@ export function analyzeResponse(commentBody, originalComment) {
   // Determine response type
   let type = 'acknowledgment';
   
-  // Check for questions
+  // Check for questions (highest priority - check first)
   const questionIndicators = [
-    '?',
     'why',
     'how',
     'what',
@@ -25,11 +24,14 @@ export function analyzeResponse(commentBody, originalComment) {
     'are there',
   ];
   
-  if (questionIndicators.some(indicator => lowerBody.includes(indicator))) {
+  const hasQuestionMark = commentBody.includes('?');
+  const hasQuestionWord = questionIndicators.some(indicator => lowerBody.includes(indicator));
+  
+  if (hasQuestionMark || hasQuestionWord) {
     type = 'question';
   }
   
-  // Check for defensive responses
+  // Check for defensive responses (only if not already a question)
   const defenseIndicators = [
     'but',
     'however',
@@ -48,7 +50,8 @@ export function analyzeResponse(commentBody, originalComment) {
     'on purpose',
   ];
   
-  if (defenseIndicators.some(indicator => lowerBody.includes(indicator)) && 
+  if (type !== 'question' &&
+      defenseIndicators.some(indicator => lowerBody.includes(indicator)) && 
       !lowerBody.includes('you\'re right') && 
       !lowerBody.includes('good point')) {
     type = 'defense';
