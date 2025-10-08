@@ -78,22 +78,217 @@ jobs:
             core.setOutput('size_label', sizeLabel);
             core.setOutput('size_comment', sizeComment);
 
-      # 🔍 Extract review rules from README.md
-      - name: Extract Review Rules from README
-        id: readme
+      # 🔍 Read comprehensive review guidelines from .github/workflows/README.md
+      - name: Read Review Guidelines
+        id: guidelines
         run: |
-          if grep -q "## Review Rules" README.md; then
-            RULES=$(awk '/## Review Rules/{flag=1;next}/^## /{flag=0}flag' README.md)
-            echo "rules<<EOF" >> $GITHUB_OUTPUT
-            echo "$RULES" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+          GUIDELINES_FILE=".github/workflows/README.md"
+          if [ -f "$GUIDELINES_FILE" ]; then
+            echo "guidelines_exist=true" >> $GITHUB_OUTPUT
           else
-            echo "rules<<EOF" >> $GITHUB_OUTPUT
-            echo "_No review rules section found in README.md._" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            echo "guidelines_exist=false" >> $GITHUB_OUTPUT
           fi
 
-      # Post automated PR review comment
+      # Comprehensive code analysis - analyze all files together
+      - name: Analyze Code Quality
+        id: analyze
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Decode files from base64
+            const filesData = JSON.parse(Buffer.from('${{ steps.pr-details.outputs.all_files }}', 'base64').toString());
+            
+            const issues = [];
+            const classesWithoutTests = [];
+            const solidViolations = [];
+            
+            // Helper to check if file is a Java source file
+            function isJavaSource(filename) {
+              return filename.endsWith('.java') && !filename.includes('/test/');
+            }
+            
+            // Helper to check if file is a test file
+            function isJavaTest(filename) {
+              return filename.endsWith('.java') && filename.includes('/test/');
+            }
+            
+            // Get all Java source files
+            const javaFiles = filesData.filter(f => isJavaSource(f.filename));
+            const testFiles = filesData.filter(f => isJavaTest(f.filename));
+            
+            // Read and analyze each Java source file
+            for (const file of javaFiles) {
+              try {
+                const content = fs.readFileSync(file.filename, 'utf8');
+                const className = path.basename(file.filename, '.java');
+                
+                // Check for test coverage
+                const hasTest = testFiles.some(tf => {
+                  const testName = path.basename(tf.filename, '.java');
+                  return testName === `${className}Test` || 
+                         testName === `${className}Tests` ||
+                         testName.includes(className);
+                });
+                
+                // Detect class type
+                const isController = content.includes('@RestController') || content.includes('@Controller');
+                const isService = content.includes('@Service');
+                const isRepository = content.includes('@Repository');
+                const isComponent = content.includes('@Component');
+                const isDTO = content.includes('@Data') || content.includes('class') && content.includes('DTO');
+                const isModel = content.includes('@Entity') || content.includes('@Document');
+                
+                // Flag classes that need tests (Controllers, Services, Repositories, Components)
+                if ((isController || isService || isRepository || isComponent) && !hasTest && !isDTO && !isModel) {
+                  classesWithoutTests.push({
+                    file: file.filename,
+                    className: className,
+                    type: isController ? 'Controller' : isService ? 'Service' : isRepository ? 'Repository' : 'Component'
+                  });
+                }
+                
+                // Check Single Responsibility Principle
+                const lines = content.split('\n');
+                const methods = (content.match(/public\s+\w+\s+\w+\s*\(/g) || []).length;
+                const privateFields = (content.match(/private\s+\w+\s+\w+;/g) || []).length;
+                
+                // Heuristic: If a class has many methods AND many fields, it might violate SRP
+                if (methods > 10 && privateFields > 8) {
+                  solidViolations.push({
+                    file: file.filename,
+                    className: className,
+                    issue: `Potential SRP violation: Class has ${methods} public methods and ${privateFields} private fields. Consider splitting responsibilities.`
+                  });
+                }
+                
+                // Check for large files (>500 lines)
+                if (lines.length > 500 && !file.filename.includes('README') && !file.filename.includes('.md')) {
+                  issues.push({
+                    file: file.filename,
+                    type: 'warning',
+                    message: `File has ${lines.length} lines (>500). Consider breaking it into smaller modules.`
+                  });
+                }
+                
+                // Check for empty classes
+                const hasNoMethods = methods === 0;
+                const hasNoFields = privateFields === 0;
+                if (hasNoMethods && hasNoFields && !isDTO) {
+                  issues.push({
+                    file: file.filename,
+                    type: 'critical',
+                    message: 'Empty class detected. Classes should have implementation or be removed.'
+                  });
+                }
+                
+                // Check for TODO/FIXME without issue tracking
+                const todos = content.match(/\/\/\s*(TODO|FIXME)(?!.*#\d+)/gi) || [];
+                if (todos.length > 0) {
+                  issues.push({
+                    file: file.filename,
+                    type: 'suggestion',
+                    message: `Found ${todos.length} TODO/FIXME comment(s) without issue references. Link them to tracked issues.`
+                  });
+                }
+                
+              } catch (error) {
+                console.log(`Could not analyze ${file.filename}: ${error.message}`);
+              }
+            }
+            
+            // Format results
+            const analysisResults = {
+              classesWithoutTests: classesWithoutTests.length,
+              solidViolations: solidViolations.length,
+              totalIssues: issues.length,
+              details: {
+                classesWithoutTests,
+                solidViolations,
+                issues
+              }
+            };
+            
+            core.setOutput('analysis', JSON.stringify(analysisResults));
+            core.setOutput('has_issues', (classesWithoutTests.length > 0 || solidViolations.length > 0 || issues.length > 0).toString());
+
+      # Post comprehensive review comments on specific files
+      - name: Post File-Specific Review Comments
+        if: steps.analyze.outputs.has_issues == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const analysis = JSON.parse('${{ steps.analyze.outputs.analysis }}');
+            
+            // Get the PR diff to find line positions for comments
+            const { data: prFiles } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            
+            // Comment on classes without tests
+            for (const item of analysis.details.classesWithoutTests) {
+              const file = prFiles.find(f => f.filename === item.file);
+              if (file && file.patch) {
+                // Find the class declaration line in the patch
+                const patchLines = file.patch.split('\n');
+                let position = 1;
+                for (let i = 0; i < patchLines.length; i++) {
+                  if (patchLines[i].includes(`class ${item.className}`)) {
+                    position = i + 1;
+                    break;
+                  }
+                }
+                
+                try {
+                  await github.rest.pulls.createReviewComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: context.issue.number,
+                    body: `⚠️ **Missing Unit Tests**\n\nThis ${item.type} class does not have unit tests. Unit tests are mandatory for all Controllers, Services, Repositories, and Components.\n\nPlease add comprehensive unit tests for this class.`,
+                    commit_id: context.payload.pull_request.head.sha,
+                    path: item.file,
+                    position: position
+                  });
+                } catch (error) {
+                  console.log(`Could not comment on ${item.file}: ${error.message}`);
+                }
+              }
+            }
+            
+            // Comment on SOLID violations
+            for (const item of analysis.details.solidViolations) {
+              const file = prFiles.find(f => f.filename === item.file);
+              if (file && file.patch) {
+                const patchLines = file.patch.split('\n');
+                let position = 1;
+                for (let i = 0; i < patchLines.length; i++) {
+                  if (patchLines[i].includes(`class ${item.className}`)) {
+                    position = i + 1;
+                    break;
+                  }
+                }
+                
+                try {
+                  await github.rest.pulls.createReviewComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: context.issue.number,
+                    body: `🔍 **SOLID Principle Concern**\n\n${item.issue}\n\nConsider refactoring this class to follow the Single Responsibility Principle.`,
+                    commit_id: context.payload.pull_request.head.sha,
+                    path: item.file,
+                    position: position
+                  });
+                } catch (error) {
+                  console.log(`Could not comment on ${item.file}: ${error.message}`);
+                }
+              }
+            }
+
+      # Post automated PR review summary
       - name: Post review comment
         uses: actions/github-script@v7
         with:
@@ -102,7 +297,48 @@ jobs:
             const additions = parseInt('${{ steps.pr-details.outputs.additions }}');
             const deletions = parseInt('${{ steps.pr-details.outputs.deletions }}');
             const sizeComment = '${{ steps.check-size.outputs.size_comment }}';
-            const rules = `${{ steps.readme.outputs.rules }}`;
+            const guidelinesExist = '${{ steps.guidelines.outputs.guidelines_exist }}' === 'true';
+            const hasIssues = '${{ steps.analyze.outputs.has_issues }}' === 'true';
+            
+            let analysisSection = '';
+            if (hasIssues) {
+              const analysis = JSON.parse('${{ steps.analyze.outputs.analysis }}');
+              
+              analysisSection = `\n### 🔍 Code Analysis Results (All Files Reviewed Together)
+
+            #### Summary
+            - **Classes without tests:** ${analysis.classesWithoutTests}
+            - **SOLID principle violations:** ${analysis.solidViolations}
+            - **Other issues:** ${analysis.totalIssues}
+            
+            `;
+              
+              if (analysis.classesWithoutTests > 0) {
+                analysisSection += `\n#### ⚠️ Missing Unit Tests\n`;
+                for (const item of analysis.details.classesWithoutTests) {
+                  analysisSection += `- \`${item.file}\` - ${item.type} requires unit tests\n`;
+                }
+              }
+              
+              if (analysis.solidViolations > 0) {
+                analysisSection += `\n#### 🔍 SOLID Principle Violations\n`;
+                for (const item of analysis.details.solidViolations) {
+                  analysisSection += `- \`${item.file}\` - ${item.issue}\n`;
+                }
+              }
+              
+              if (analysis.totalIssues > 0) {
+                analysisSection += `\n#### 📋 Other Issues\n`;
+                for (const item of analysis.details.issues) {
+                  const emoji = item.type === 'critical' ? '🚨' : item.type === 'warning' ? '⚠️' : '💡';
+                  analysisSection += `- ${emoji} \`${item.file}\` - ${item.message}\n`;
+                }
+              }
+            } else {
+              analysisSection = `\n### ✅ Code Analysis Results
+              
+            All files have been reviewed together. No critical issues found.`;
+            }
 
             const reviewComment = `## 🤖 Automated PR Review
 
@@ -114,20 +350,22 @@ jobs:
 
             ### Size Assessment
             ${sizeComment}
+            ${analysisSection}
 
-            ### 🔍 Project Review Rules (from README.md)
-            ${rules}
-
-            ### Checklist
+            ### 📋 Review Checklist
             Please ensure the following before merging:
-            - [ ] Code follows the project's coding standards
-            - [ ] Tests have been added/updated
+            - [ ] Code follows the project's coding standards and SOLID principles
+            - [ ] All classes have appropriate unit tests (Controllers, Services, Repositories, Components)
+            - [ ] No empty classes or controllers
+            - [ ] Large files (>500 lines) are split if needed
+            - [ ] TODO/FIXME comments are tracked in issues
             - [ ] Documentation has been updated (if needed)
             - [ ] All CI checks pass
             - [ ] PR has been reviewed by at least one team member
+            ${guidelinesExist ? '\n- [ ] Code adheres to guidelines in `.github/workflows/README.md`' : ''}
 
             ---
-            *This is an automated review. Please reach out to maintainers if you have questions.*`;
+            *This is an automated review analyzing all files together. ${hasIssues ? 'Review comments have been posted on specific files.' : ''} Please reach out to maintainers if you have questions.*`;
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
