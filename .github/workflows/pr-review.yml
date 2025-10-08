@@ -97,42 +97,42 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            
+
             // Decode files from base64
             const filesData = JSON.parse(Buffer.from('${{ steps.pr-details.outputs.all_files }}', 'base64').toString());
-            
+
             const issues = [];
             const classesWithoutTests = [];
             const solidViolations = [];
-            
+
             // Helper to check if file is a Java source file
             function isJavaSource(filename) {
               return filename.endsWith('.java') && !filename.includes('/test/');
             }
-            
+
             // Helper to check if file is a test file
             function isJavaTest(filename) {
               return filename.endsWith('.java') && filename.includes('/test/');
             }
-            
+
             // Get all Java source files
             const javaFiles = filesData.filter(f => isJavaSource(f.filename));
             const testFiles = filesData.filter(f => isJavaTest(f.filename));
-            
+
             // Read and analyze each Java source file
             for (const file of javaFiles) {
               try {
                 const content = fs.readFileSync(file.filename, 'utf8');
                 const className = path.basename(file.filename, '.java');
-                
+
                 // Check for test coverage
                 const hasTest = testFiles.some(tf => {
                   const testName = path.basename(tf.filename, '.java');
-                  return testName === `${className}Test` || 
+                  return testName === `${className}Test` ||
                          testName === `${className}Tests` ||
                          testName.includes(className);
                 });
-                
+
                 // Detect class type
                 const isController = content.includes('@RestController') || content.includes('@Controller');
                 const isService = content.includes('@Service');
@@ -140,7 +140,7 @@ jobs:
                 const isComponent = content.includes('@Component');
                 const isDTO = content.includes('@Data') || content.includes('class') && content.includes('DTO');
                 const isModel = content.includes('@Entity') || content.includes('@Document');
-                
+
                 // Flag classes that need tests (Controllers, Services, Repositories, Components)
                 if ((isController || isService || isRepository || isComponent) && !hasTest && !isDTO && !isModel) {
                   classesWithoutTests.push({
@@ -149,12 +149,12 @@ jobs:
                     type: isController ? 'Controller' : isService ? 'Service' : isRepository ? 'Repository' : 'Component'
                   });
                 }
-                
+
                 // Check Single Responsibility Principle
                 const lines = content.split('\n');
                 const methods = (content.match(/public\s+(?:static\s+)?(?:final\s+)?\w+\s+\w+\s*\(/g) || []).length;
                 const privateFields = (content.match(/private\s+(?:static\s+)?(?:final\s+)?\w+\s+\w+\s*[;=]/g) || []).length;
-                
+
                 // Heuristic: If a class has many methods AND many fields, it might violate SRP
                 if (methods > 10 && privateFields > 8) {
                   solidViolations.push({
@@ -163,7 +163,7 @@ jobs:
                     issue: `Potential SRP violation: Class has ${methods} public methods and ${privateFields} private fields. Consider splitting responsibilities.`
                   });
                 }
-                
+
                 // Check for large files (>500 lines)
                 if (lines.length > 500 && !file.filename.includes('README') && !file.filename.includes('.md')) {
                   issues.push({
@@ -172,11 +172,11 @@ jobs:
                     message: `File has ${lines.length} lines (>500). Consider breaking it into smaller modules.`
                   });
                 }
-                
+
                 // Check for empty classes (exclude Application classes)
                 const hasNoMethods = methods === 0;
                 const hasNoFields = privateFields === 0;
-                const isApplicationClass = content.includes('@SpringBootApplication') || 
+                const isApplicationClass = content.includes('@SpringBootApplication') ||
                                           content.includes('public static void main');
                 if (hasNoMethods && hasNoFields && !isDTO && !isApplicationClass) {
                   issues.push({
@@ -185,7 +185,7 @@ jobs:
                     message: 'Empty class detected. Classes should have implementation or be removed.'
                   });
                 }
-                
+
                 // Check for TODO/FIXME without issue tracking
                 const todos = content.match(/\/\/\s*(TODO|FIXME)(?!.*#\d+)/gi) || [];
                 if (todos.length > 0) {
@@ -195,12 +195,12 @@ jobs:
                     message: `Found ${todos.length} TODO/FIXME comment(s) without issue references. Link them to tracked issues.`
                   });
                 }
-                
+
               } catch (error) {
                 console.log(`Could not analyze ${file.filename}: ${error.message}`);
               }
             }
-            
+
             // Format results
             const analysisResults = {
               classesWithoutTests: classesWithoutTests.length,
@@ -212,7 +212,7 @@ jobs:
                 issues
               }
             };
-            
+
             core.setOutput('analysis', JSON.stringify(analysisResults));
             core.setOutput('has_issues', (classesWithoutTests.length > 0 || solidViolations.length > 0 || issues.length > 0).toString());
 
@@ -223,14 +223,14 @@ jobs:
         with:
           script: |
             const analysis = JSON.parse('${{ steps.analyze.outputs.analysis }}');
-            
+
             // Get the PR diff to find line positions for comments
             const { data: prFiles } = await github.rest.pulls.listFiles({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.issue.number
             });
-            
+
             // Comment on classes without tests
             for (const item of analysis.details.classesWithoutTests) {
               const file = prFiles.find(f => f.filename === item.file);
@@ -244,7 +244,7 @@ jobs:
                     break;
                   }
                 }
-                
+
                 try {
                   await github.rest.pulls.createReviewComment({
                     owner: context.repo.owner,
@@ -260,7 +260,7 @@ jobs:
                 }
               }
             }
-            
+
             // Comment on SOLID violations
             for (const item of analysis.details.solidViolations) {
               const file = prFiles.find(f => f.filename === item.file);
@@ -273,7 +273,7 @@ jobs:
                     break;
                   }
                 }
-                
+
                 try {
                   await github.rest.pulls.createReviewComment({
                     owner: context.repo.owner,
@@ -301,34 +301,34 @@ jobs:
             const sizeComment = '${{ steps.check-size.outputs.size_comment }}';
             const guidelinesExist = '${{ steps.guidelines.outputs.guidelines_exist }}' === 'true';
             const hasIssues = '${{ steps.analyze.outputs.has_issues }}' === 'true';
-            
+
             let analysisSection = '';
             if (hasIssues) {
               const analysis = JSON.parse('${{ steps.analyze.outputs.analysis }}');
-              
+
               analysisSection = `\n### 🔍 Code Analysis Results (All Files Reviewed Together)
 
             #### Summary
             - **Classes without tests:** ${analysis.classesWithoutTests}
             - **SOLID principle violations:** ${analysis.solidViolations}
             - **Other issues:** ${analysis.totalIssues}
-            
+
             `;
-              
+
               if (analysis.classesWithoutTests > 0) {
                 analysisSection += `\n#### ⚠️ Missing Unit Tests\n`;
                 for (const item of analysis.details.classesWithoutTests) {
                   analysisSection += `- \`${item.file}\` - ${item.type} requires unit tests\n`;
                 }
               }
-              
+
               if (analysis.solidViolations > 0) {
                 analysisSection += `\n#### 🔍 SOLID Principle Violations\n`;
                 for (const item of analysis.details.solidViolations) {
                   analysisSection += `- \`${item.file}\` - ${item.issue}\n`;
                 }
               }
-              
+
               if (analysis.totalIssues > 0) {
                 analysisSection += `\n#### 📋 Other Issues\n`;
                 for (const item of analysis.details.issues) {
@@ -338,7 +338,7 @@ jobs:
               }
             } else {
               analysisSection = `\n### ✅ Code Analysis Results
-              
+
             All files have been reviewed together. No critical issues found.`;
             }
 
