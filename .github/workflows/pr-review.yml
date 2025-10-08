@@ -152,8 +152,8 @@ jobs:
                 
                 // Check Single Responsibility Principle
                 const lines = content.split('\n');
-                const methods = (content.match(/public\s+\w+\s+\w+\s*\(/g) || []).length;
-                const privateFields = (content.match(/private\s+\w+\s+\w+;/g) || []).length;
+                const methods = (content.match(/public\s+(?:static\s+)?(?:final\s+)?\w+\s+\w+\s*\(/g) || []).length;
+                const privateFields = (content.match(/private\s+(?:static\s+)?(?:final\s+)?\w+\s+\w+\s*[;=]/g) || []).length;
                 
                 // Heuristic: If a class has many methods AND many fields, it might violate SRP
                 if (methods > 10 && privateFields > 8) {
@@ -173,10 +173,12 @@ jobs:
                   });
                 }
                 
-                // Check for empty classes
+                // Check for empty classes (exclude Application classes)
                 const hasNoMethods = methods === 0;
                 const hasNoFields = privateFields === 0;
-                if (hasNoMethods && hasNoFields && !isDTO) {
+                const isApplicationClass = content.includes('@SpringBootApplication') || 
+                                          content.includes('public static void main');
+                if (hasNoMethods && hasNoFields && !isDTO && !isApplicationClass) {
                   issues.push({
                     file: file.filename,
                     type: 'critical',
