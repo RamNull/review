@@ -30,7 +30,7 @@ public class Reviewcontroller {
 
     @GetMapping("api/v1/products")
     public Flux<Product> getProducts(){
-      return webClient.get().uri("https://fakestoreapi.com/products")
+      return webClient.get().uri(uri)
       .retrieve().bodyToFlux(Product.class);
     }
 
